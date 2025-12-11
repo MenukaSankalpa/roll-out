@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cey-Cloud Launch</title>
+  <style>
+    :root{
+      --grad-1: #6b00f5; /* purple-ish from logo */
+      --grad-2: #00d6ff; /* cyan-ish from logo */
+      --accent: #0b2b5a;
+      --glass: rgba(255,255,255,0.06);
+    }
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{
+      display:flex;align-items:center;justify-content:center;
+      background: radial-gradient(1200px 600px at 10% 10%, rgba(0,214,255,0.08), transparent), linear-gradient(135deg,var(--grad-1),var(--grad-2));
+      color:white;
+      overflow:hidden;
+    }
+    .container{width:100%;max-width:980px;padding:40px;box-sizing:border-box;text-align:center}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));backdrop-filter: blur(6px);border-radius:18px;padding:28px;box-shadow:0 10px 30px rgba(11,43,90,0.18)}
+    .logo{height:92px;width:auto;margin:0 auto 12px;display:block}
+    h1{margin:6px 0 0;font-size:28px;letter-spacing:0.6px}
+
+    .countdown{font-size:72px;font-weight:700;margin:22px 0;letter-spacing:2px}
+    .controls{display:flex;gap:12px;justify-content:center;align-items:center}
+    .btn{padding:12px 20px;border-radius:12px;border:0;cursor:pointer;font-weight:700;box-shadow:0 6px 18px rgba(11,43,90,0.18)}
+    .btn-primary{background:linear-gradient(90deg,var(--grad-1),var(--grad-2));color:#fff}
+
+    .status{margin-top:18px;font-weight:600}
+
+    /* celebration canvas sitting full page */
+    #confettiCanvas{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:50}
+
+    .launched-banner{display:flex;gap:16px;align-items:center;justify-content:center;flex-direction:column;margin-top:18px}
+    .launched-banner img{height:84px}
+    .launch-text{font-size:28px;font-weight:800;letter-spacing:1px}
+
+    /* small responsive tweaks */
+    @media (max-width:520px){.countdown{font-size:44px}.logo{height:72px}.card{padding:18px}}
+  </style>
+</head>
+<body>
+  <canvas id="confettiCanvas"></canvas>
+  <div class="container">
+    <div class="card" role="region" aria-label="CeyCloud Launch Panel">
+      <img class="logo" src="/mnt/data/WhatsApp Image 2025-11-19 at 3.57.36 PM.jpeg.jpg" alt="CeyCloud logo" />
+      <h1>Cey-Cloud Launch</h1>
+
+      <div class="countdown" id="count" aria-live="polite">—</div>
+
+      <div class="controls">
+        <button id="launchBtn" class="btn btn-primary" aria-label="Start launch countdown">Launch</button>
+      </div>
+
+      <div class="status" id="status">Status: Waiting for launch</div>
+
+      <div class="launched-banner" id="launchedBanner" aria-hidden="true" style="display:none">
+        <img src="/mnt/data/WhatsApp Image 2025-11-19 at 3.57.36 PM.jpeg.jpg" alt="CeyCloud"/>
+        <div class="launch-text">INTRANET LAUNCHED — Welcome to CeyCloud</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Elements - NOTE: removed reference to non-existent resetBtn to avoid error
+    const launchBtn = document.getElementById('launchBtn');
+    const countEl = document.getElementById('count');
+    const statusEl = document.getElementById('status');
+    const launchedBanner = document.getElementById('launchedBanner');
+
+    let countdownInterval = null;
+    let current = 10;
+    let isRunning = false;
+
+    function speak(text, rate=1){
+      try{
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = rate;
+        u.pitch = 1;
+        u.lang = 'en-US';
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      }catch(e){console.warn('Speech not supported', e)}
+    }
+
+    // simple beep using WebAudio for ticks and fanfare
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioCtx ? new AudioCtx() : null;
+    function beep(frequency, duration, type='sine', vol=0.05){
+      if(!audioCtx) return;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.value = frequency;
+      g.gain.value = vol;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      setTimeout(()=>{o.stop()}, duration);
+    }
+
+    function startCountdown(){
+      if(isRunning) return;
+      isRunning = true;
+      current = 10;
+      countEl.textContent = current;
+      statusEl.textContent = 'Status: Launching...';
+      // speak removed as requested
+      // speak('');
+
+      // step immediately for 10, then decrement each second
+      countdownInterval = setInterval(()=>{
+        // speak and tick
+        speak(String(current), 1);
+        beep(800 - current*20, 120, 'square', 0.03);
+
+        countEl.textContent = current;
+        if(current === 1){
+          // final step
+          clearInterval(countdownInterval);
+          setTimeout(()=>{
+            finishLaunch();
+          }, 900);
+        }
+        current -= 1;
+        if(current < 0) current = 0;
+      }, 1000);
+    }
+
+    // keep reset functionality internal but not bound to a removed button
+    function resetInternal(){
+      if(countdownInterval) clearInterval(countdownInterval);
+      isRunning = false;
+      current = 10;
+      countEl.textContent = '—';
+      statusEl.textContent = 'Status: Waiting for launch';
+      launchedBanner.style.display = 'none';
+      clearConfetti();
+    }
+
+    function finishLaunch(){
+      isRunning = false;
+      countEl.textContent = '0';
+      statusEl.textContent = 'Status: Launched';
+      // speak removed as requested
+      // speak('');
+      playFanfare();
+      fireConfetti();
+      // show banner briefly
+      launchedBanner.style.display = 'flex';
+      launchedBanner.setAttribute('aria-hidden','false');
+      // small animate scale
+      launchedBanner.animate([
+        {transform:'scale(0.8)',opacity:0},
+        {transform:'scale(1.02)',opacity:1},
+        {transform:'scale(1)',opacity:1}
+      ],{duration:800,easing:'cubic-bezier(.2,.8,.2,1)'});
+
+      // remove the banner text/section shortly after the celebration starts
+      setTimeout(()=>{
+        try{ launchedBanner.style.display = 'none'; launchedBanner.setAttribute('aria-hidden','true'); }catch(e){}
+      }, 1800);
+
+      // automatically navigate to the intranet in the same tab after celebration starts
+      const intranetUrl = '/mnt/data/WhatsApp Image 2025-11-19 at 3.57.36 PM.jpeg.jpg';
+      // developer note: the local file path above will be transformed to a usable URL by the hosting environment
+      setTimeout(()=>{
+        window.location.href = 'https://sites.google.com/ceyline-group.lk/ceyline-holdings/home?authuser=0';
+      }, 2200);
+    }
+
+    launchBtn.addEventListener('click', ()=>{
+      if(!isRunning){
+        // resume audio context on some browsers
+        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        startCountdown();
+      }
+    });
+    // removed resetBtn listener (it was causing the TypeError because element did not exist)
+
+    // --- lightweight confetti implementation ---
+    const canvas = document.getElementById('confettiCanvas');
+    const ctx = canvas.getContext('2d');
+    let W = canvas.width = innerWidth;
+    let H = canvas.height = innerHeight;
+    window.addEventListener('resize', ()=>{W = canvas.width = innerWidth; H = canvas.height = innerHeight});
+
+    let confettiPieces = [];
+    function random(min, max){return Math.random()*(max-min)+min}
+    function createPiece(){
+      return {
+        x: random(0,W),
+        y: random(-50, -10),
+        size: random(6,14),
+        tilt: random(-0.2,0.2),
+        speedY: random(1.6,4.8),
+        rotation: random(0,Math.PI*2),
+        rotSpeed: random(-0.1,0.1),
+        color: ['#6b00f5','#9b4cff','#00d6ff','#2bd1ff'][Math.floor(random(0,4))]
+      }
+    }
+    function fireConfetti(){
+      for(let i=0;i<220;i++) confettiPieces.push(createPiece());
+      // auto stop after 8s
+      setTimeout(()=>{confettiPieces = confettiPieces.slice(0,40)},8000);
+    }
+    function clearConfetti(){confettiPieces=[]; ctx.clearRect(0,0,W,H)}
+    function drawConfetti(){
+      ctx.clearRect(0,0,W,H);
+      for(let p of confettiPieces){
+        p.y += p.speedY; p.x += Math.sin(p.y*0.02)*1.2; p.rotation += p.rotSpeed;
+        ctx.save();
+        ctx.translate(p.x,p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+        ctx.restore();
+      }
+      // remove pieces that left screen
+      confettiPieces = confettiPieces.filter(p => p.y < H + 60);
+      requestAnimationFrame(drawConfetti);
+    }
+    drawConfetti();
+
+    // fanfare with chords using WebAudio
+    function playFanfare(){
+      if(!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const t = 0.05;
+      const freqs = [880, 1320, 1760];
+      const master = audioCtx.createGain(); master.gain.value = 0.06; master.connect(audioCtx.destination);
+      freqs.forEach((f,i)=>{
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.value = 0.0001;
+        o.connect(g); g.connect(master);
+        o.start(now + i*0.02);
+        g.gain.linearRampToValueAtTime(0.06, now + i*0.02 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1 + i*0.05);
+        o.stop(now + 1.5 + i*0.05);
+      });
+
+      // joyful pop bursts
+      for(let i=0;i<6;i++){
+        setTimeout(()=>{beep(400 + i*80, 160, 'sine', 0.03)}, i*140);
+      }
+    }
+
+    // Small accessibility: keyboard start (Enter/Space)
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault(); launchBtn.click();
+      }
+    });
+
+    // initial animation
+    (function intro(){
+      countEl.textContent = '—';
+      document.querySelector('.card').animate([{transform:'translateY(10px)',opacity:0},{transform:'translateY(0)',opacity:1}],{duration:700,easing:'ease-out'});
+    })();
+  </script>
+</body>
+</html>
